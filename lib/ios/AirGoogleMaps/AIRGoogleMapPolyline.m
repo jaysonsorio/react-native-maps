@@ -3,6 +3,8 @@
 //
 //  Created by Nick Italiano on 10/22/16.
 //
+
+#ifdef HAVE_GOOGLE_MAPS
 #import <UIKit/UIKit.h>
 #import "AIRGoogleMapPolyline.h"
 #import "AIRGMSPolyline.h"
@@ -32,13 +34,36 @@
     [path addCoordinate:coordinates[i].coordinate];
   }
 
-   _polyline.path = path;
+  _polyline.path = path;
+
+  [self configureStyleSpansIfNeeded];
 }
 
 -(void)setStrokeColor:(UIColor *)strokeColor
 {
   _strokeColor = strokeColor;
   _polyline.strokeColor = strokeColor;
+  [self configureStyleSpansIfNeeded];
+}
+
+-(void)setStrokeColors:(NSArray<UIColor *> *)strokeColors
+{
+  NSMutableArray *spans = [NSMutableArray arrayWithCapacity:[strokeColors count]];
+  for (int i = 0; i < [strokeColors count]; i++)
+  {
+    GMSStrokeStyle *stroke;
+
+     if (i == 0) {
+      stroke = [GMSStrokeStyle solidColor:strokeColors[i]];
+    } else {
+      stroke = [GMSStrokeStyle gradientFromColor:strokeColors[i-1] toColor:strokeColors[i]];
+    }
+
+     [spans addObject:[GMSStyleSpan spanWithStyle:stroke]];
+  }
+
+  _strokeColors = strokeColors;
+  _polyline.spans = spans;
 }
 
 -(void)setStrokeWidth:(double)strokeWidth
@@ -51,6 +76,11 @@
 {
   _fillColor = fillColor;
   _polyline.spans = @[[GMSStyleSpan spanWithColor:fillColor]];
+}
+
+- (void)setLineDashPattern:(NSArray<NSNumber *> *)lineDashPattern {
+  _lineDashPattern = lineDashPattern;
+  [self configureStyleSpansIfNeeded];
 }
 
 -(void)setGeodesic:(BOOL)geodesic
@@ -81,4 +111,25 @@
   _polyline.onPress = onPress;
 }
 
+- (void)configureStyleSpansIfNeeded {
+  if (!_strokeColor || !_lineDashPattern || !_polyline.path) {
+      return;
+  }
+
+  BOOL isLine = YES;
+  NSMutableArray *styles = [[NSMutableArray alloc] init];
+  for (NSInteger i = 0; i < _lineDashPattern.count; i++) {
+    if (isLine) {
+      [styles addObject:[GMSStrokeStyle solidColor:_strokeColor]];
+    } else {
+      [styles addObject:[GMSStrokeStyle solidColor:[UIColor clearColor]]];
+    }
+    isLine = !isLine;
+  }
+
+  _polyline.spans = GMSStyleSpans(_polyline.path, styles, _lineDashPattern, kGMSLengthRhumb);
+}
+
 @end
+
+#endif
